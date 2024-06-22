@@ -35,6 +35,7 @@ process.noDeprecation = true;
 const cache = require('../lib/cache').default;
 const defaults = require('../lib/defaults').default;
 const ParseServer = require('../lib/index').ParseServer;
+const loadAdapter = require('../lib/Adapters/AdapterLoader').loadAdapter;
 const path = require('path');
 const TestUtils = require('../lib/TestUtils');
 const GridFSBucketAdapter = require('../lib/Adapters/Files/GridFSBucketAdapter')
@@ -50,16 +51,22 @@ const { VolatileClassesSchemas } = require('../lib/Controllers/SchemaController'
 const mongoURI = 'mongodb://localhost:27017/parseServerMongoAdapterTestDatabase';
 const postgresURI = 'postgres://localhost:5432/parse_server_postgres_adapter_test_database';
 let databaseAdapter;
+let databaseURI;
 // need to bind for mocking mocha
 
-if (process.env.PARSE_SERVER_TEST_DB === 'postgres') {
+if (process.env.PARSE_SERVER_DATABASE_ADAPTER) {
+  databaseAdapter = JSON.parse(process.env.PARSE_SERVER_DATABASE_ADAPTER);
+  databaseAdapter = loadAdapter(databaseAdapter);
+} else if (process.env.PARSE_SERVER_TEST_DB === 'postgres') {
+  databaseURI = process.env.PARSE_SERVER_TEST_DATABASE_URI || postgresURI;
   databaseAdapter = new PostgresStorageAdapter({
-    uri: process.env.PARSE_SERVER_TEST_DATABASE_URI || postgresURI,
+    uri: databaseURI,
     collectionPrefix: 'test_',
   });
 } else {
+  databaseURI = mongoURI;
   databaseAdapter = new MongoStorageAdapter({
-    uri: mongoURI,
+    uri: databaseURI,
     collectionPrefix: 'test_',
   });
 }
@@ -100,9 +107,10 @@ const defaultConfiguration = {
   restAPIKey: 'rest',
   webhookKey: 'hook',
   masterKey: 'test',
+  maintenanceKey: 'testing',
   readOnlyMasterKey: 'read-only-test',
   fileKey: 'test',
-  directAccess: false,
+  directAccess: true,
   silent,
   logLevel,
   fileUpload: {
@@ -125,7 +133,18 @@ const defaultConfiguration = {
     },
     shortLivedAuth: mockShortLivedAuth(),
   },
+  allowClientClassCreation: true,
 };
+
+if (silent) {
+  defaultConfiguration.logLevels = {
+    cloudFunctionSuccess: 'silent',
+    cloudFunctionError: 'silent',
+    triggerAfter: 'silent',
+    triggerBeforeError: 'silent',
+    triggerBeforeSuccess: 'silent',
+  };
+}
 
 if (process.env.PARSE_SERVER_TEST_CACHE === 'redis') {
   defaultConfiguration.cacheAdapter = new RedisCacheAdapter();
@@ -148,47 +167,33 @@ let server;
 let didChangeConfiguration = false;
 
 // Allows testing specific configurations of Parse Server
-const reconfigureServer = (changedConfiguration = {}) => {
-  return new Promise((resolve, reject) => {
-    if (server) {
-      return server.close(() => {
-        server = undefined;
-        reconfigureServer(changedConfiguration).then(resolve, reject);
-      });
-    }
-    try {
-      let parseServer = undefined;
-      didChangeConfiguration = Object.keys(changedConfiguration).length !== 0;
-      const newConfiguration = Object.assign({}, defaultConfiguration, changedConfiguration, {
-        serverStartComplete: error => {
-          if (error) {
-            reject(error);
-          } else {
-            Parse.CoreManager.setRESTController(RESTController);
-            resolve(parseServer);
-          }
-        },
-        mountPath: '/1',
-        port,
-      });
-      cache.clear();
-      parseServer = ParseServer.start(newConfiguration);
-      parseServer.expressApp.use('/1', err => {
-        console.error(err);
-        fail('should not call next');
-      });
-      server = parseServer.server;
-      server.on('connection', connection => {
-        const key = `${connection.remoteAddress}:${connection.remotePort}`;
-        openConnections[key] = connection;
-        connection.on('close', () => {
-          delete openConnections[key];
-        });
-      });
-    } catch (error) {
-      reject(error);
-    }
+const reconfigureServer = async (changedConfiguration = {}) => {
+  if (server) {
+    await new Promise(resolve => server.close(resolve));
+    server = undefined;
+    return reconfigureServer(changedConfiguration);
+  }
+  didChangeConfiguration = Object.keys(changedConfiguration).length !== 0;
+  const newConfiguration = Object.assign({}, defaultConfiguration, changedConfiguration, {
+    mountPath: '/1',
+    port,
   });
+  cache.clear();
+  const parseServer = await ParseServer.startApp(newConfiguration);
+  server = parseServer.server;
+  Parse.CoreManager.setRESTController(RESTController);
+  parseServer.expressApp.use('/1', err => {
+    console.error(err);
+    fail('should not call next');
+  });
+  server.on('connection', connection => {
+    const key = `${connection.remoteAddress}:${connection.remotePort}`;
+    openConnections[key] = connection;
+    connection.on('close', () => {
+      delete openConnections[key];
+    });
+  });
+  return parseServer;
 };
 
 // Set up a Parse client to talk to our test API server
@@ -209,6 +214,10 @@ beforeAll(async () => {
   Parse.serverURL = 'http://localhost:' + port + '/1';
 });
 
+beforeEach(() => {
+  jasmine.DEFAULT_TIMEOUT_INTERVAL = process.env.PARSE_SERVER_TEST_TIMEOUT || 10000;
+});
+
 afterEach(function (done) {
   const afterLogOut = async () => {
     if (Object.keys(openConnections).length > 0) {
@@ -225,6 +234,7 @@ afterEach(function (done) {
     done();
   };
   Parse.Cloud._removeAllHooks();
+  Parse.CoreManager.getLiveQueryController().setDefaultLiveQueryClient();
   defaults.protectedFields = { _User: { '*': ['email'] } };
   databaseAdapter
     .getAllClasses()
@@ -420,6 +430,7 @@ global.defaultConfiguration = defaultConfiguration;
 global.mockCustomAuthenticator = mockCustomAuthenticator;
 global.mockFacebookAuthenticator = mockFacebookAuthenticator;
 global.databaseAdapter = databaseAdapter;
+global.databaseURI = databaseURI;
 global.jfail = function (err) {
   fail(JSON.stringify(err));
 };
@@ -429,6 +440,26 @@ global.it_exclude_dbs = excluded => {
     return xit;
   } else {
     return it;
+  }
+};
+
+let testExclusionList = [];
+try {
+  // Fetch test exclusion list
+  testExclusionList = require('./testExclusionList.json');
+  console.log(`Using test exclusion list with ${testExclusionList.length} entries`);
+} catch (error) {
+  if (error.code !== 'MODULE_NOT_FOUND') {
+    throw error;
+  }
+}
+
+// Disable test if its UUID is found in testExclusionList
+global.it_id = (id, func) => {
+  if (testExclusionList.includes(id)) {
+    return xit;
+  } else {
+    return func || it;
   }
 };
 
@@ -551,6 +582,16 @@ global.describe_only_db = db => {
   }
 };
 
+global.fdescribe_only_db = db => {
+  if (process.env.PARSE_SERVER_TEST_DB == db) {
+    return fdescribe;
+  } else if (!process.env.PARSE_SERVER_TEST_DB && db == 'mongo') {
+    return fdescribe;
+  } else {
+    return xdescribe;
+  }
+};
+
 global.describe_only = validator => {
   if (validator()) {
     return describe;
@@ -576,4 +617,4 @@ jasmine.restoreLibrary = function (library, name) {
   require(library)[name] = libraryCache[library][name];
 };
 
-jasmine.timeout = t => new Promise(resolve => setTimeout(resolve, t));
+jasmine.timeout = (t = 100) => new Promise(resolve => setTimeout(resolve, t));

@@ -8,7 +8,7 @@ require('./helper');
 const { updateCLP } = require('./support/dev');
 
 const pluralize = require('pluralize');
-const { getMainDefinition } = require('apollo-utilities');
+const { getMainDefinition } = require('@apollo/client/utilities');
 const { createUploadLink } = require('apollo-upload-client');
 const { SubscriptionClient } = require('subscriptions-transport-ws');
 const { WebSocketLink } = require('@apollo/client/link/ws');
@@ -49,7 +49,9 @@ describe('ParseGraphQLServer', () => {
   let parseGraphQLServer;
 
   beforeEach(async () => {
-    parseServer = await global.reconfigureServer({});
+    parseServer = await global.reconfigureServer({
+      maxUploadSize: '1kb',
+    });
     parseGraphQLServer = new ParseGraphQLServer(parseServer, {
       graphQLPath: '/graphql',
       playgroundPath: '/playground',
@@ -122,15 +124,16 @@ describe('ParseGraphQLServer', () => {
       info: new Object(),
       config: new Object(),
       auth: new Object(),
+      get: () => {},
+    };
+    const res = {
+      set: () => {},
     };
 
     it("should return schema and context with req's info, config and auth", async () => {
       const options = await parseGraphQLServer._getGraphQLOptions();
-      expect(options.multipart).toEqual({
-        fileSize: 20971520,
-      });
       expect(options.schema).toEqual(parseGraphQLServer.parseGraphQLSchema.graphQLSchema);
-      const contextResponse = options.context({ req });
+      const contextResponse = await options.context({ req, res });
       expect(contextResponse.info).toEqual(req.info);
       expect(contextResponse.config).toEqual(req.config);
       expect(contextResponse.auth).toEqual(req.auth);
@@ -292,30 +295,37 @@ describe('ParseGraphQLServer', () => {
     let objects = [];
 
     async function prepareData() {
+      const acl = new Parse.ACL();
+      acl.setPublicReadAccess(true);
       user1 = new Parse.User();
       user1.setUsername('user1');
       user1.setPassword('user1');
       user1.setEmail('user1@user1.user1');
+      user1.setACL(acl);
       await user1.signUp();
 
       user2 = new Parse.User();
       user2.setUsername('user2');
       user2.setPassword('user2');
+      user2.setACL(acl);
       await user2.signUp();
 
       user3 = new Parse.User();
       user3.setUsername('user3');
       user3.setPassword('user3');
+      user3.setACL(acl);
       await user3.signUp();
 
       user4 = new Parse.User();
       user4.setUsername('user4');
       user4.setPassword('user4');
+      user4.setACL(acl);
       await user4.signUp();
 
       user5 = new Parse.User();
       user5.setUsername('user5');
       user5.setPassword('user5');
+      user5.setACL(acl);
       await user5.signUp();
 
       const roleACL = new Parse.ACL();
@@ -425,7 +435,7 @@ describe('ParseGraphQLServer', () => {
       const expressApp = express();
       httpServer = http.createServer(expressApp);
       expressApp.use('/parse', parseServer.app);
-      parseLiveQueryServer = ParseServer.createLiveQueryServer(httpServer, {
+      parseLiveQueryServer = await ParseServer.createLiveQueryServer(httpServer, {
         port: 1338,
       });
       parseGraphQLServer.applyGraphQL(expressApp);
@@ -942,8 +952,7 @@ describe('ParseGraphQLServer', () => {
           ).data['__type'].inputFields
             .map(field => field.name)
             .sort();
-
-          expect(inputFields).toEqual(['clientMutationId', 'password', 'username']);
+          expect(inputFields).toEqual(['authData', 'clientMutationId', 'password', 'username']);
         });
 
         it('should have clientMutationId in log in mutation payload', async () => {
@@ -5269,7 +5278,6 @@ describe('ParseGraphQLServer', () => {
 
           it('should only count', async () => {
             await prepareData();
-
             await parseGraphQLServer.parseGraphQLSchema.schemaCache.clear();
 
             const where = {
@@ -6827,7 +6835,7 @@ describe('ParseGraphQLServer', () => {
 
       describe('Files Mutations', () => {
         describe('Create', () => {
-          it_only_node_version('<17')('should return File object', async () => {
+          it('should return File object', async () => {
             const clientMutationId = uuidv4();
 
             parseServer = await global.reconfigureServer({
@@ -7027,7 +7035,66 @@ describe('ParseGraphQLServer', () => {
       });
 
       describe('Users Mutations', () => {
+        const challengeAdapter = {
+          validateAuthData: () => Promise.resolve({ response: { someData: true } }),
+          validateAppId: () => Promise.resolve(),
+          challenge: () => Promise.resolve({ someData: true }),
+          options: { anOption: true },
+        };
+
+        it('should create user and return authData response', async () => {
+          parseServer = await global.reconfigureServer({
+            publicServerURL: 'http://localhost:13377/parse',
+            auth: {
+              challengeAdapter,
+            },
+          });
+          const clientMutationId = uuidv4();
+
+          const result = await apolloClient.mutate({
+            mutation: gql`
+              mutation createUser($input: CreateUserInput!) {
+                createUser(input: $input) {
+                  clientMutationId
+                  user {
+                    id
+                    authDataResponse
+                  }
+                }
+              }
+            `,
+            variables: {
+              input: {
+                clientMutationId,
+                fields: {
+                  authData: {
+                    challengeAdapter: {
+                      id: 'challengeAdapter',
+                    },
+                  },
+                },
+              },
+            },
+            context: {
+              headers: {
+                'X-Parse-Master-Key': 'test',
+              },
+            },
+          });
+
+          expect(result.data.createUser.clientMutationId).toEqual(clientMutationId);
+          expect(result.data.createUser.user.authDataResponse).toEqual({
+            challengeAdapter: { someData: true },
+          });
+        });
+
         it('should sign user up', async () => {
+          parseServer = await global.reconfigureServer({
+            publicServerURL: 'http://localhost:13377/parse',
+            auth: {
+              challengeAdapter,
+            },
+          });
           const clientMutationId = uuidv4();
           const userSchema = new Parse.Schema('_User');
           userSchema.addString('someField');
@@ -7044,6 +7111,7 @@ describe('ParseGraphQLServer', () => {
                     sessionToken
                     user {
                       someField
+                      authDataResponse
                       aPointer {
                         id
                         username
@@ -7059,11 +7127,17 @@ describe('ParseGraphQLServer', () => {
                 fields: {
                   username: 'user1',
                   password: 'user1',
+                  authData: {
+                    challengeAdapter: {
+                      id: 'challengeAdapter',
+                    },
+                  },
                   aPointer: {
                     createAndLink: {
                       username: 'user2',
                       password: 'user2',
                       someField: 'someValue2',
+                      ACL: { public: { read: true, write: true } },
                     },
                   },
                   someField: 'someValue',
@@ -7078,6 +7152,9 @@ describe('ParseGraphQLServer', () => {
           expect(result.data.signUp.viewer.user.aPointer.id).toBeDefined();
           expect(result.data.signUp.viewer.user.aPointer.username).toEqual('user2');
           expect(typeof result.data.signUp.viewer.sessionToken).toBe('string');
+          expect(result.data.signUp.viewer.user.authDataResponse).toEqual({
+            challengeAdapter: { someData: true },
+          });
         });
 
         it('should login with user', async () => {
@@ -7086,6 +7163,7 @@ describe('ParseGraphQLServer', () => {
           parseServer = await global.reconfigureServer({
             publicServerURL: 'http://localhost:13377/parse',
             auth: {
+              challengeAdapter,
               myAuth: {
                 module: global.mockCustomAuthenticator('parse', 'graphql'),
               },
@@ -7105,6 +7183,7 @@ describe('ParseGraphQLServer', () => {
                     sessionToken
                     user {
                       someField
+                      authDataResponse
                       aPointer {
                         id
                         username
@@ -7118,6 +7197,7 @@ describe('ParseGraphQLServer', () => {
               input: {
                 clientMutationId,
                 authData: {
+                  challengeAdapter: { id: 'challengeAdapter' },
                   myAuth: {
                     id: 'parse',
                     password: 'graphql',
@@ -7130,6 +7210,7 @@ describe('ParseGraphQLServer', () => {
                       username: 'user2',
                       password: 'user2',
                       someField: 'someValue2',
+                      ACL: { public: { read: true, write: true } },
                     },
                   },
                 },
@@ -7143,9 +7224,92 @@ describe('ParseGraphQLServer', () => {
           expect(typeof result.data.logInWith.viewer.sessionToken).toBe('string');
           expect(result.data.logInWith.viewer.user.aPointer.id).toBeDefined();
           expect(result.data.logInWith.viewer.user.aPointer.username).toEqual('user2');
+          expect(result.data.logInWith.viewer.user.authDataResponse).toEqual({
+            challengeAdapter: { someData: true },
+          });
+        });
+
+        it('should handle challenge', async () => {
+          const clientMutationId = uuidv4();
+
+          spyOn(challengeAdapter, 'challenge').and.callThrough();
+          parseServer = await global.reconfigureServer({
+            publicServerURL: 'http://localhost:13377/parse',
+            auth: {
+              challengeAdapter,
+            },
+          });
+
+          const user = new Parse.User();
+          await user.save({ username: 'username', password: 'password' });
+
+          const result = await apolloClient.mutate({
+            mutation: gql`
+              mutation Challenge($input: ChallengeInput!) {
+                challenge(input: $input) {
+                  clientMutationId
+                  challengeData
+                }
+              }
+            `,
+            variables: {
+              input: {
+                clientMutationId,
+                username: 'username',
+                password: 'password',
+                challengeData: {
+                  challengeAdapter: { someChallengeData: true },
+                },
+              },
+            },
+          });
+
+          const challengeCall = challengeAdapter.challenge.calls.argsFor(0);
+          expect(challengeAdapter.challenge).toHaveBeenCalledTimes(1);
+          expect(challengeCall[0]).toEqual({ someChallengeData: true });
+          expect(challengeCall[1]).toEqual(undefined);
+          expect(challengeCall[2]).toEqual(challengeAdapter);
+          expect(challengeCall[3].object instanceof Parse.User).toBeTruthy();
+          expect(challengeCall[3].original instanceof Parse.User).toBeTruthy();
+          expect(challengeCall[3].isChallenge).toBeTruthy();
+          expect(challengeCall[3].object.id).toEqual(user.id);
+          expect(challengeCall[3].original.id).toEqual(user.id);
+          expect(result.data.challenge.clientMutationId).toEqual(clientMutationId);
+          expect(result.data.challenge.challengeData).toEqual({
+            challengeAdapter: { someData: true },
+          });
+
+          await expectAsync(
+            apolloClient.mutate({
+              mutation: gql`
+                mutation Challenge($input: ChallengeInput!) {
+                  challenge(input: $input) {
+                    clientMutationId
+                    challengeData
+                  }
+                }
+              `,
+              variables: {
+                input: {
+                  clientMutationId,
+                  username: 'username',
+                  password: 'wrongPassword',
+                  challengeData: {
+                    challengeAdapter: { someChallengeData: true },
+                  },
+                },
+              },
+            })
+          ).toBeRejected();
         });
 
         it('should log the user in', async () => {
+          parseServer = await global.reconfigureServer({
+            publicServerURL: 'http://localhost:13377/parse',
+            auth: {
+              challengeAdapter,
+            },
+          });
           const clientMutationId = uuidv4();
           const user = new Parse.User();
           user.setUsername('user1');
@@ -7162,6 +7326,7 @@ describe('ParseGraphQLServer', () => {
                   viewer {
                     sessionToken
                     user {
+                      authDataResponse
                       someField
                     }
                   }
@@ -7173,6 +7338,7 @@ describe('ParseGraphQLServer', () => {
                 clientMutationId,
                 username: 'user1',
                 password: 'user1',
+                authData: { challengeAdapter: { token: true } },
               },
             },
           });
@@ -7181,6 +7347,9 @@ describe('ParseGraphQLServer', () => {
           expect(result.data.logIn.viewer.sessionToken).toBeDefined();
           expect(result.data.logIn.viewer.user.someField).toEqual('someValue');
           expect(typeof result.data.logIn.viewer.sessionToken).toBe('string');
+          expect(result.data.logIn.viewer.user.authDataResponse).toEqual({
+            challengeAdapter: { someData: true },
+          });
         });
 
         it('should log the user out', async () => {
@@ -8155,18 +8324,20 @@ describe('ParseGraphQLServer', () => {
           const someClass = new Parse.Object('SomeClass');
           await someClass.save();
 
+          const roleACL = new Parse.ACL();
+          roleACL.setPublicReadAccess(true);
+
           const user = new Parse.User();
           user.set('username', 'username');
           user.set('password', 'password');
+          user.setACL(roleACL);
           await user.signUp();
 
           const user2 = new Parse.User();
           user2.set('username', 'username2');
           user2.set('password', 'password2');
+          user2.setACL(roleACL);
           await user2.signUp();
-
-          const roleACL = new Parse.ACL();
-          roleACL.setPublicReadAccess(true);
 
           const role = new Parse.Role('aRole', roleACL);
           await role.save();
@@ -9130,7 +9301,7 @@ describe('ParseGraphQLServer', () => {
           expect(result6[0].node.name).toEqual('imACountry3');
         });
 
-        it_only_node_version('<17')('should support files', async () => {
+        it('should support files', async () => {
           try {
             parseServer = await global.reconfigureServer({
               publicServerURL: 'http://localhost:13377/parse',
@@ -9172,7 +9343,6 @@ describe('ParseGraphQLServer', () => {
             expect(res.status).toEqual(200);
 
             const result = JSON.parse(await res.text());
-
             expect(result.data.createFile.fileInfo.name).toEqual(
               jasmine.stringMatching(/_myFileName.txt$/)
             );
@@ -9378,9 +9548,234 @@ describe('ParseGraphQLServer', () => {
           }
         });
 
-        it_only_node_version('<17')('should not upload if file is too large', async () => {
-          parseGraphQLServer.parseServer.config.maxUploadSize = '1kb';
+        it('should support files on required file', async () => {
+          try {
+            parseServer = await global.reconfigureServer({
+              publicServerURL: 'http://localhost:13377/parse',
+            });
+            const schemaController = await parseServer.config.databaseController.loadSchema();
+            await schemaController.addClassIfNotExists('SomeClassWithRequiredFile', {
+              someField: { type: 'File', required: true },
+            });
+            await resetGraphQLCache();
+            await parseGraphQLServer.parseGraphQLSchema.schemaCache.clear();
 
+            const body = new FormData();
+            body.append(
+              'operations',
+              JSON.stringify({
+                query: `
+                  mutation CreateSomeObject(
+                    $fields: CreateSomeClassWithRequiredFileFieldsInput
+                  ) {
+                    createSomeClassWithRequiredFile(
+                      input: { fields: $fields }
+                    ) {
+                      someClassWithRequiredFile {
+                        id
+                        someField {
+                          name
+                          url
+                        }
+                      }
+                    }
+                  }
+                  `,
+                variables: {
+                  fields: {
+                    someField: { upload: null },
+                  },
+                },
+              })
+            );
+            body.append('map', JSON.stringify({ 1: ['variables.fields.someField.upload'] }));
+            body.append('1', 'My File Content', {
+              filename: 'myFileName.txt',
+              contentType: 'text/plain',
+            });
+
+            const res = await fetch('http://localhost:13377/graphql', {
+              method: 'POST',
+              headers,
+              body,
+            });
+            expect(res.status).toEqual(200);
+            const resText = await res.text();
+            const result = JSON.parse(resText);
+            expect(
+              result.data.createSomeClassWithRequiredFile.someClassWithRequiredFile.someField.name
+            ).toEqual(jasmine.stringMatching(/_myFileName.txt$/));
+            expect(
+              result.data.createSomeClassWithRequiredFile.someClassWithRequiredFile.someField.url
+            ).toEqual(jasmine.stringMatching(/_myFileName.txt$/));
+          } catch (e) {
+            handleError(e);
+          }
+        });
+
+        it('should support file upload for on fly creation through pointer and relation', async () => {
+          parseServer = await global.reconfigureServer({
+            publicServerURL: 'http://localhost:13377/parse',
+          });
+          const schema = new Parse.Schema('SomeClass');
+          schema.addFile('someFileField');
+          schema.addPointer('somePointerField', 'SomeClass');
+          schema.addRelation('someRelationField', 'SomeClass');
+          await schema.save();
+
+          const body = new FormData();
+          body.append(
+            'operations',
+            JSON.stringify({
+              query: `
+                mutation UploadFiles(
+                  $fields: CreateSomeClassFieldsInput
+                ) {
+                  createSomeClass(
+                    input: { fields: $fields }
+                  ) {
+                    someClass {
+                      id
+                      someFileField {
+                        name
+                        url
+                      }
+                      somePointerField {
+                        id
+                        someFileField {
+                          name
+                          url
+                        }
+                      }
+                      someRelationField {
+                        edges {
+                          node {
+                            id
+                            someFileField {
+                              name
+                              url
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                `,
+              variables: {
+                fields: {
+                  someFileField: { upload: null },
+                  somePointerField: {
+                    createAndLink: {
+                      someFileField: { upload: null },
+                    },
+                  },
+                  someRelationField: {
+                    createAndAdd: [
+                      {
+                        someFileField: { upload: null },
+                      },
+                    ],
+                  },
+                },
+              },
+            })
+          );
+          body.append(
+            'map',
+            JSON.stringify({
+              1: ['variables.fields.someFileField.upload'],
+              2: ['variables.fields.somePointerField.createAndLink.someFileField.upload'],
+              3: ['variables.fields.someRelationField.createAndAdd.0.someFileField.upload'],
+            })
+          );
+          body.append('1', 'My File Content someFileField', {
+            filename: 'someFileField.txt',
+            contentType: 'text/plain',
+          });
+          body.append('2', 'My File Content somePointerField', {
+            filename: 'somePointerField.txt',
+            contentType: 'text/plain',
+          });
+          body.append('3', 'My File Content someRelationField', {
+            filename: 'someRelationField.txt',
+            contentType: 'text/plain',
+          });
+
+          const res = await fetch('http://localhost:13377/graphql', {
+            method: 'POST',
+            headers,
+            body,
+          });
+          expect(res.status).toEqual(200);
+          const result = await res.json();
+          console.log(result);
+          expect(result.data.createSomeClass.someClass.someFileField.name).toEqual(
+            jasmine.stringMatching(/_someFileField.txt$/)
+          );
+          expect(result.data.createSomeClass.someClass.somePointerField.someFileField.name).toEqual(
+            jasmine.stringMatching(/_somePointerField.txt$/)
+          );
+          expect(
+            result.data.createSomeClass.someClass.someRelationField.edges[0].node.someFileField.name
+          ).toEqual(jasmine.stringMatching(/_someRelationField.txt$/));
+        });
+
+        it('should support files and add extension from mimetype', async () => {
+          try {
+            parseServer = await global.reconfigureServer({
+              publicServerURL: 'http://localhost:13377/parse',
+            });
+
+            const body = new FormData();
+            body.append(
+              'operations',
+              JSON.stringify({
+                query: `
+                    mutation CreateFile($input: CreateFileInput!) {
+                      createFile(input: $input) {
+                        fileInfo {
+                          name
+                          url
+                        }
+                      }
+                    }
+                  `,
+                variables: {
+                  input: {
+                    upload: null,
+                  },
+                },
+              })
+            );
+            body.append('map', JSON.stringify({ 1: ['variables.input.upload'] }));
+            body.append('1', 'My File Content', {
+              // No extension, the system should add it from mimetype
+              filename: 'myFileName',
+              contentType: 'text/plain',
+            });
+
+            const res = await fetch('http://localhost:13377/graphql', {
+              method: 'POST',
+              headers,
+              body,
+            });
+
+            expect(res.status).toEqual(200);
+
+            const result = JSON.parse(await res.text());
+            expect(result.data.createFile.fileInfo.name).toEqual(
+              jasmine.stringMatching(/_myFileName.txt$/)
+            );
+            expect(result.data.createFile.fileInfo.url).toEqual(
+              jasmine.stringMatching(/_myFileName.txt$/)
+            );
+          } catch (e) {
+            handleError(e);
+          }
+        });
+
+        it('should not upload if file is too large', async () => {
           const body = new FormData();
           body.append(
             'operations',
@@ -9405,6 +9800,7 @@ describe('ParseGraphQLServer', () => {
           body.append('map', JSON.stringify({ 1: ['variables.input.upload'] }));
           body.append(
             '1',
+            // In this test file parse server is setup with 1kb limit
             Buffer.alloc(parseGraphQLServer._transformMaxUploadSizeToBytes('2kb'), 1),
             {
               filename: 'myFileName.txt',
@@ -9419,8 +9815,10 @@ describe('ParseGraphQLServer', () => {
           });
 
           const result = JSON.parse(await res.text());
-          expect(res.status).toEqual(500);
-          expect(result.errors[0].message).toEqual('File size limit exceeded: 1024 bytes');
+          expect(res.status).toEqual(200);
+          expect(result.errors[0].message).toEqual(
+            'File truncated as it exceeds the 1024 byte size limit.'
+          );
         });
 
         it('should support object values', async () => {
@@ -10444,6 +10842,9 @@ describe('ParseGraphQLServer', () => {
           const user = new Parse.User();
           user.setUsername('user1');
           user.setPassword('user1');
+          const acl = new Parse.ACL();
+          acl.setPublicReadAccess(true);
+          user.setACL(acl);
           await user.signUp();
 
           await parseGraphQLServer.parseGraphQLSchema.schemaCache.clear();

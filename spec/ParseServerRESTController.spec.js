@@ -2,7 +2,6 @@ const ParseServerRESTController = require('../lib/ParseServerRESTController')
   .ParseServerRESTController;
 const ParseServer = require('../lib/ParseServer').default;
 const Parse = require('parse/node').Parse;
-const semver = require('semver');
 const TestUtils = require('../lib/TestUtils');
 
 let RESTController;
@@ -130,19 +129,13 @@ describe('ParseServerRESTController', () => {
   });
 
   if (
-    (semver.satisfies(process.env.MONGODB_VERSION, '>=4.0.4') &&
-      process.env.MONGODB_TOPOLOGY === 'replicaset' &&
-      process.env.MONGODB_STORAGE_ENGINE === 'wiredTiger') ||
+    process.env.MONGODB_TOPOLOGY === 'replicaset' ||
     process.env.PARSE_SERVER_TEST_DB === 'postgres'
   ) {
     describe('transactions', () => {
       beforeEach(async () => {
         await TestUtils.destroyAllDataPermanently(true);
-        if (
-          semver.satisfies(process.env.MONGODB_VERSION, '>=4.0.4') &&
-          process.env.MONGODB_TOPOLOGY === 'replicaset' &&
-          process.env.MONGODB_STORAGE_ENGINE === 'wiredTiger'
-        ) {
+        if (process.env.MONGODB_TOPOLOGY === 'replicaset') {
           await reconfigureServer({
             databaseAdapter: undefined,
             databaseURI:
@@ -637,5 +630,59 @@ describe('ParseServerRESTController', () => {
     expect(sessions.length).toBe(1);
     expect(sessions[0].get('installationId')).toBe(installationId);
     expect(sessions[0].get('sessionToken')).toBe(loggedUser.sessionToken);
+  });
+
+  it('returns a statusId when running jobs', async () => {
+    Parse.Cloud.job('CloudJob', () => {
+      return 'Cloud job completed';
+    });
+    const res = await RESTController.request(
+      'POST',
+      '/jobs/CloudJob',
+      {},
+      { useMasterKey: true, returnStatus: true }
+    );
+    const jobStatusId = res._headers['X-Parse-Job-Status-Id'];
+    expect(jobStatusId).toBeDefined();
+    const result = await Parse.Cloud.getJobStatus(jobStatusId);
+    expect(result.id).toBe(jobStatusId);
+  });
+
+  it('returns a statusId when running push notifications', async () => {
+    const payload = {
+      data: { alert: 'We return status!' },
+      where: { deviceType: 'ios' },
+    };
+    const res = await RESTController.request('POST', '/push', payload, {
+      useMasterKey: true,
+      returnStatus: true,
+    });
+    const pushStatusId = res._headers['X-Parse-Push-Status-Id'];
+    expect(pushStatusId).toBeDefined();
+
+    const result = await Parse.Push.getPushStatus(pushStatusId);
+    expect(result.id).toBe(pushStatusId);
+  });
+
+  it('returns a statusId when running batch push notifications', async () => {
+    const payload = {
+      data: { alert: 'We return status!' },
+      where: { deviceType: 'ios' },
+    };
+    const res = await RESTController.request('POST', 'batch', {
+      requests: [{
+        method: 'POST',
+        path: '/push',
+        body: payload,
+      }],
+    }, {
+      useMasterKey: true,
+      returnStatus: true,
+    });
+    const pushStatusId = res[0]._headers['X-Parse-Push-Status-Id'];
+    expect(pushStatusId).toBeDefined();
+
+    const result = await Parse.Push.getPushStatus(pushStatusId);
+    expect(result.id).toBe(pushStatusId);
   });
 });

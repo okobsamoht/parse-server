@@ -6,7 +6,6 @@ const databaseURI = 'mongodb://localhost:27017/parseServerMongoAdapterTestDataba
 const request = require('../lib/request');
 const Config = require('../lib/Config');
 const TestUtils = require('../lib/TestUtils');
-const semver = require('semver');
 
 const fakeClient = {
   s: { options: { dbName: null } },
@@ -213,6 +212,89 @@ describe_only_db('mongo')('MongoStorageAdapter', () => {
       });
   });
 
+  it('handles nested dates', async () => {
+    await new Parse.Object('MyClass', {
+      foo: {
+        test: {
+          date: new Date(),
+        },
+      },
+      bar: {
+        date: new Date(),
+      },
+      date: new Date(),
+    }).save();
+    const adapter = Config.get(Parse.applicationId).database.adapter;
+    const [object] = await adapter._rawFind('MyClass', {});
+    expect(object.date instanceof Date).toBeTrue();
+    expect(object.bar.date instanceof Date).toBeTrue();
+    expect(object.foo.test.date instanceof Date).toBeTrue();
+  });
+
+  it('handles nested dates in array ', async () => {
+    await new Parse.Object('MyClass', {
+      foo: {
+        test: {
+          date: [new Date()],
+        },
+      },
+      bar: {
+        date: [new Date()],
+      },
+      date: [new Date()],
+    }).save();
+    const adapter = Config.get(Parse.applicationId).database.adapter;
+    const [object] = await adapter._rawFind('MyClass', {});
+    expect(object.date[0] instanceof Date).toBeTrue();
+    expect(object.bar.date[0] instanceof Date).toBeTrue();
+    expect(object.foo.test.date[0] instanceof Date).toBeTrue();
+    const obj = await new Parse.Query('MyClass').first({ useMasterKey: true });
+    expect(obj.get('date')[0] instanceof Date).toBeTrue();
+    expect(obj.get('bar').date[0] instanceof Date).toBeTrue();
+    expect(obj.get('foo').test.date[0] instanceof Date).toBeTrue();
+  });
+
+  it('upserts with $setOnInsert', async () => {
+    const uuid = require('uuid');
+    const uuid1 = uuid.v4();
+    const uuid2 = uuid.v4();
+    const schema = {
+      className: 'MyClass',
+      fields: {
+        x: { type: 'Number' },
+        count: { type: 'Number' },
+      },
+      classLevelPermissions: {},
+    };
+
+    const myClassSchema = new Parse.Schema(schema.className);
+    myClassSchema.setCLP(schema.classLevelPermissions);
+    await myClassSchema.save();
+
+    const query = {
+      x: 1,
+    };
+    const update = {
+      objectId: {
+        __op: 'SetOnInsert',
+        amount: uuid1,
+      },
+      count: {
+        __op: 'Increment',
+        amount: 1,
+      },
+    };
+    await Parse.Server.database.update('MyClass', query, update, { upsert: true });
+    update.objectId.amount = uuid2;
+    await Parse.Server.database.update('MyClass', query, update, { upsert: true });
+
+    const res = await Parse.Server.database.find(schema.className, {}, {});
+    expect(res.length).toBe(1);
+    expect(res[0].objectId).toBe(uuid1);
+    expect(res[0].count).toBe(2);
+    expect(res[0].x).toBe(1);
+  });
+
   it('handles updating a single object with array, object date', done => {
     const adapter = new MongoStorageAdapter({ uri: databaseURI });
 
@@ -401,11 +483,7 @@ describe_only_db('mongo')('MongoStorageAdapter', () => {
     expect(schemaAfterDeletion.fields.test).toBeUndefined();
   });
 
-  if (
-    semver.satisfies(process.env.MONGODB_VERSION, '>=4.0.4') &&
-    process.env.MONGODB_TOPOLOGY === 'replicaset' &&
-    process.env.MONGODB_STORAGE_ENGINE === 'wiredTiger'
-  ) {
+  if (process.env.MONGODB_TOPOLOGY === 'replicaset') {
     describe('transactions', () => {
       const headers = {
         'Content-Type': 'application/json',

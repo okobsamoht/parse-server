@@ -2,11 +2,11 @@
 const Parse = require('parse/node').Parse;
 const crypto = require('crypto');
 const jwksClient = require('jwks-rsa');
-const util = require('util');
 const jwt = require('jsonwebtoken');
 const httpsRequest = require('./httpsRequest');
+const authUtils = require('./utils');
 
-const TOKEN_ISSUER = 'https://facebook.com';
+const TOKEN_ISSUER = 'https://www.facebook.com';
 
 function getAppSecretPath(authData, options = {}) {
   const appSecret = options.appSecret;
@@ -59,11 +59,9 @@ const getFacebookKeyByKeyId = async (keyId, cacheMaxEntries, cacheMaxAge) => {
     cacheMaxAge,
   });
 
-  const asyncGetSigningKeyFunction = util.promisify(client.getSigningKey);
-
   let key;
   try {
-    key = await asyncGetSigningKeyFunction(keyId);
+    key = await authUtils.getSigningKey(client, keyId);
   } catch (error) {
     throw new Parse.Error(
       Parse.Error.OBJECT_NOT_FOUND,
@@ -73,21 +71,12 @@ const getFacebookKeyByKeyId = async (keyId, cacheMaxEntries, cacheMaxAge) => {
   return key;
 };
 
-const getHeaderFromToken = token => {
-  const decodedToken = jwt.decode(token, { complete: true });
-  if (!decodedToken) {
-    throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'provided token does not decode as JWT');
-  }
-
-  return decodedToken.header;
-};
-
 const verifyIdToken = async ({ token, id }, { clientId, cacheMaxEntries, cacheMaxAge }) => {
   if (!token) {
     throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'id token is invalid for this user.');
   }
 
-  const { kid: keyId, alg: algorithm } = getHeaderFromToken(token);
+  const { kid: keyId, alg: algorithm } = authUtils.getHeaderFromToken(token);
   const ONE_HOUR_IN_MS = 3600000;
   let jwtClaims;
 
