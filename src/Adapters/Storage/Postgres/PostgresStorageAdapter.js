@@ -175,6 +175,8 @@ const toPostgresSchema = schema => {
   return schema;
 };
 
+const isArrayIndex = (arrayIndex) => Array.from(arrayIndex).every(c => c >= '0' && c <= '9');
+
 const handleDotFields = object => {
   Object.keys(object).forEach(fieldName => {
     if (fieldName.indexOf('.') > -1) {
@@ -187,9 +189,7 @@ const handleDotFields = object => {
       if (value && value.__op === 'Delete') {
         value = undefined;
       }
-      /* eslint-disable no-cond-assign */
       while ((next = components.shift())) {
-        /* eslint-enable no-cond-assign */
         currentObj[next] = currentObj[next] || {};
         if (components.length === 0) {
           currentObj[next] = value;
@@ -207,7 +207,11 @@ const transformDotFieldToComponents = fieldName => {
     if (index === 0) {
       return `"${cmpt}"`;
     }
-    return `'${cmpt}'`;
+    if (isArrayIndex(cmpt)) {
+      return Number(cmpt);
+    } else {
+      return `'${cmpt}'`;
+    }
   });
 };
 
@@ -813,6 +817,7 @@ const buildWhereClause = ({ schema, query, index, caseInsensitive }): WhereClaus
             if (parserResult.status === 'success') {
               postgresValue = toPostgresValue(parserResult.result);
             } else {
+              // eslint-disable-next-line no-console
               console.error('Error while parsing relative date', parserResult);
               throw new Parse.Error(
                 Parse.Error.INVALID_JSON,
@@ -911,6 +916,7 @@ export class PostgresStorageAdapter implements StorageAdapter {
       this._stream
         .none('NOTIFY $1~, $2', ['schema.change', { senderId: this._uuid }])
         .catch(error => {
+          // eslint-disable-next-line no-console
           console.log('Failed to Notify:', error); // unlikely to ever happen
         });
     }
@@ -2370,7 +2376,7 @@ export class PostgresStorageAdapter implements StorageAdapter {
         debug(`initializationDone in ${ctx.duration}`);
       })
       .catch(error => {
-        /* eslint-disable no-console */
+        // eslint-disable-next-line no-console
         console.error(error);
       });
   }

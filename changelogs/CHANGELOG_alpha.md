@@ -1,3 +1,254 @@
+# [8.0.0-alpha.12](https://github.com/parse-community/parse-server/compare/8.0.0-alpha.11...8.0.0-alpha.12) (2025-02-24)
+
+
+### Bug Fixes
+
+* LiveQueryServer crashes using cacheAdapter on disconnect from Redis 4 server ([#9616](https://github.com/parse-community/parse-server/issues/9616)) ([bbc6bd4](https://github.com/parse-community/parse-server/commit/bbc6bd4b3f493170c13ad3314924cbf1f379eca4))
+
+# [8.0.0-alpha.11](https://github.com/parse-community/parse-server/compare/8.0.0-alpha.10...8.0.0-alpha.11) (2025-02-12)
+
+
+### Features
+
+* Add dynamic master key by setting Parse Server option `masterKey` to a function ([#9582](https://github.com/parse-community/parse-server/issues/9582)) ([6f1d161](https://github.com/parse-community/parse-server/commit/6f1d161a2f263a166981f9544cf2aadce65afe23))
+
+# [8.0.0-alpha.10](https://github.com/parse-community/parse-server/compare/8.0.0-alpha.9...8.0.0-alpha.10) (2025-02-01)
+
+
+### Bug Fixes
+
+* Security upgrade node from 20.17.0-alpine3.20 to 20.18.2-alpine3.20 ([#9583](https://github.com/parse-community/parse-server/issues/9583)) ([8f85ae2](https://github.com/parse-community/parse-server/commit/8f85ae205474f65414c0536754de12c87dbbf82a))
+
+# [8.0.0-alpha.9](https://github.com/parse-community/parse-server/compare/8.0.0-alpha.8...8.0.0-alpha.9) (2025-01-30)
+
+
+### Features
+
+* Add TypeScript support ([#9550](https://github.com/parse-community/parse-server/issues/9550)) ([59e46d0](https://github.com/parse-community/parse-server/commit/59e46d0aea3e6529994d98160d993144b8075291))
+
+# [8.0.0-alpha.8](https://github.com/parse-community/parse-server/compare/8.0.0-alpha.7...8.0.0-alpha.8) (2025-01-30)
+
+
+### Features
+
+* Add support for MongoDB `databaseOptions` keys `autoSelectFamily`, `autoSelectFamilyAttemptTimeout` ([#9579](https://github.com/parse-community/parse-server/issues/9579)) ([5966068](https://github.com/parse-community/parse-server/commit/5966068e963e7a79eac8fba8720ee7d83578f207))
+
+# [8.0.0-alpha.7](https://github.com/parse-community/parse-server/compare/8.0.0-alpha.6...8.0.0-alpha.7) (2025-01-28)
+
+
+### Features
+
+* Add support for MongoDB `databaseOptions` keys `minPoolSize`, `connectTimeoutMS`, `socketTimeoutMS` ([#9522](https://github.com/parse-community/parse-server/issues/9522)) ([91618fe](https://github.com/parse-community/parse-server/commit/91618fe738217b937cbfcec35969679e0adb7676))
+
+# [8.0.0-alpha.6](https://github.com/parse-community/parse-server/compare/8.0.0-alpha.5...8.0.0-alpha.6) (2025-01-12)
+
+
+### Features
+
+* Increase required minimum versions to Postgres `15`, PostGIS `3.3` ([#9538](https://github.com/parse-community/parse-server/issues/9538)) ([89c9b54](https://github.com/parse-community/parse-server/commit/89c9b5485a07a411fb35de4f8cf0467e7eb01f85))
+
+
+### BREAKING CHANGES
+
+* This releases increases the required minimum versions to Postgres `15`, PostGIS `3.3` and removes support for Postgres `13`, `14`, PostGIS `3.1`, `3.2`. ([89c9b54](89c9b54))
+
+# [8.0.0-alpha.5](https://github.com/parse-community/parse-server/compare/8.0.0-alpha.4...8.0.0-alpha.5) (2025-01-12)
+
+
+### Features
+
+* Change default value of Parse Server option `encodeParseObjectInCloudFunction` to `true` ([#9527](https://github.com/parse-community/parse-server/issues/9527)) ([5c5ad69](https://github.com/parse-community/parse-server/commit/5c5ad69b4a917b7ed7c328a8255144e105c40b08))
+
+
+### BREAKING CHANGES
+
+* The default value of Parse Server option `encodeParseObjectInCloudFunction` changes to `true`; the option has been deprecated and will be removed in a future version. ([5c5ad69](5c5ad69))
+
+# [8.0.0-alpha.4](https://github.com/parse-community/parse-server/compare/8.0.0-alpha.3...8.0.0-alpha.4) (2025-01-12)
+
+
+### Features
+
+* Deprecate `PublicAPIRouter` in favor of `PagesRouter` ([#9526](https://github.com/parse-community/parse-server/issues/9526)) ([7f66629](https://github.com/parse-community/parse-server/commit/7f666292e8b9692966672486b7108edefc356309))
+
+# [8.0.0-alpha.3](https://github.com/parse-community/parse-server/compare/8.0.0-alpha.2...8.0.0-alpha.3) (2025-01-12)
+
+
+### Features
+
+* Increase required minimum MongoDB versions to `6.0.19`, `7.0.16`, `8.0.4` ([#9531](https://github.com/parse-community/parse-server/issues/9531)) ([871e508](https://github.com/parse-community/parse-server/commit/871e5082a9fd768cee3012e26d3c8ddff5c2952c))
+
+
+### BREAKING CHANGES
+
+* This releases increases the required minimum MongoDB versions to `6.0.19`, `7.0.16`, `8.0.4` and removes support for MongoDB `4`, `5`. ([871e508](871e508))
+
+# [8.0.0-alpha.2](https://github.com/parse-community/parse-server/compare/8.0.0-alpha.1...8.0.0-alpha.2) (2025-01-11)
+
+
+### Bug Fixes
+
+* Push adapter not loading on some versions of Node 22 ([#9524](https://github.com/parse-community/parse-server/issues/9524)) ([ff7f671](https://github.com/parse-community/parse-server/commit/ff7f671c79f5dcdc44e4319a10f3654e12662c23))
+
+# [8.0.0-alpha.1](https://github.com/parse-community/parse-server/compare/7.4.0-alpha.7...8.0.0-alpha.1) (2025-01-11)
+
+
+### Features
+
+* Increase required minimum Node versions to `18.20.4`, `20.18.0`, `22.12.0` ([#9521](https://github.com/parse-community/parse-server/issues/9521)) ([4e151cd](https://github.com/parse-community/parse-server/commit/4e151cd0a52191809452f197b2f29c3a12525b67))
+
+
+### BREAKING CHANGES
+
+* This releases increases the required minimum Node versions to 18.20.4, 20.18.0, 22.12.0 and removes unofficial support for Node 19. ([4e151cd](4e151cd))
+
+# [7.4.0-alpha.7](https://github.com/parse-community/parse-server/compare/7.4.0-alpha.6...7.4.0-alpha.7) (2024-12-16)
+
+
+### Features
+
+* Upgrade @parse/push-adapter from 6.7.1 to 6.8.0 ([#9489](https://github.com/parse-community/parse-server/issues/9489)) ([286aa66](https://github.com/parse-community/parse-server/commit/286aa664ac8830d36c3e70d2316917d15f0b6df5))
+
+# [7.4.0-alpha.6](https://github.com/parse-community/parse-server/compare/7.4.0-alpha.5...7.4.0-alpha.6) (2024-11-19)
+
+
+### Bug Fixes
+
+* Security upgrade cross-spawn from 7.0.3 to 7.0.6 ([#9444](https://github.com/parse-community/parse-server/issues/9444)) ([3d034e0](https://github.com/parse-community/parse-server/commit/3d034e0a993e3e5bd9bb96a7e382bb3464f1eb68))
+
+# [7.4.0-alpha.5](https://github.com/parse-community/parse-server/compare/7.4.0-alpha.4...7.4.0-alpha.5) (2024-10-22)
+
+
+### Bug Fixes
+
+* Security upgrade node from 20.14.0-alpine3.20 to 20.17.0-alpine3.20 ([#9300](https://github.com/parse-community/parse-server/issues/9300)) ([15bb17d](https://github.com/parse-community/parse-server/commit/15bb17d87153bf0d38f08fe4c720da29a204b36b))
+
+# [7.4.0-alpha.4](https://github.com/parse-community/parse-server/compare/7.4.0-alpha.3...7.4.0-alpha.4) (2024-10-22)
+
+
+### Bug Fixes
+
+* `Parse.Query.distinct` fails due to invalid aggregate stage 'hint' ([#9295](https://github.com/parse-community/parse-server/issues/9295)) ([5f66c6a](https://github.com/parse-community/parse-server/commit/5f66c6a075cbe1cdaf9d1b108ee65af8ae596b89))
+
+# [7.4.0-alpha.3](https://github.com/parse-community/parse-server/compare/7.4.0-alpha.2...7.4.0-alpha.3) (2024-10-22)
+
+
+### Features
+
+* Add support for PostGIS 3.5 ([#9354](https://github.com/parse-community/parse-server/issues/9354)) ([8ea3538](https://github.com/parse-community/parse-server/commit/8ea35382db3436d54ab59bd30706705564b0985c))
+
+# [7.4.0-alpha.2](https://github.com/parse-community/parse-server/compare/7.4.0-alpha.1...7.4.0-alpha.2) (2024-10-07)
+
+
+### Features
+
+* Add support for Postgres 17 ([#9324](https://github.com/parse-community/parse-server/issues/9324)) ([fa2ee31](https://github.com/parse-community/parse-server/commit/fa2ee3196e4319a142b3838bb947c98dcba5d5cb))
+
+# [7.4.0-alpha.1](https://github.com/parse-community/parse-server/compare/7.3.1-alpha.1...7.4.0-alpha.1) (2024-10-06)
+
+
+### Features
+
+* Add support for MongoDB 8 ([#9269](https://github.com/parse-community/parse-server/issues/9269)) ([4756c66](https://github.com/parse-community/parse-server/commit/4756c66cd9f55afa1621d1a3f6fa850ed605cb53))
+
+## [7.3.1-alpha.1](https://github.com/parse-community/parse-server/compare/7.3.0...7.3.1-alpha.1) (2024-10-05)
+
+
+### Bug Fixes
+
+* Security upgrade fast-xml-parser from 4.4.0 to 4.4.1 ([#9262](https://github.com/parse-community/parse-server/issues/9262)) ([992d39d](https://github.com/parse-community/parse-server/commit/992d39d508f230c774dcb764d1d907ec8887e6c5))
+
+# [7.3.0-alpha.9](https://github.com/parse-community/parse-server/compare/7.3.0-alpha.8...7.3.0-alpha.9) (2024-10-03)
+
+
+### Bug Fixes
+
+* Custom object ID allows to acquire role privileges ([GHSA-8xq9-g7ch-35hg](https://github.com/parse-community/parse-server/security/advisories/GHSA-8xq9-g7ch-35hg)) ([#9317](https://github.com/parse-community/parse-server/issues/9317)) ([13ee52f](https://github.com/parse-community/parse-server/commit/13ee52f0d19ef3a3524b3d79aea100e587eb3cfc))
+
+# [7.3.0-alpha.8](https://github.com/parse-community/parse-server/compare/7.3.0-alpha.7...7.3.0-alpha.8) (2024-09-25)
+
+
+### Bug Fixes
+
+* Security upgrade path-to-regexp from 6.2.1 to 6.3.0 ([#9314](https://github.com/parse-community/parse-server/issues/9314)) ([8b7fe69](https://github.com/parse-community/parse-server/commit/8b7fe699c1c376ecd8cc1c97cce8e704ee41f28a))
+
+# [7.3.0-alpha.7](https://github.com/parse-community/parse-server/compare/7.3.0-alpha.6...7.3.0-alpha.7) (2024-08-27)
+
+
+### Features
+
+* Add support for asynchronous invocation of `FilesAdapter.getFileLocation` ([#9271](https://github.com/parse-community/parse-server/issues/9271)) ([1a2da40](https://github.com/parse-community/parse-server/commit/1a2da4055abe831b3017172fb75e16d7a8093873))
+
+# [7.3.0-alpha.6](https://github.com/parse-community/parse-server/compare/7.3.0-alpha.5...7.3.0-alpha.6) (2024-07-20)
+
+
+### Features
+
+* Add Cloud Code triggers `Parse.Cloud.beforeSave` and `Parse.Cloud.afterSave` for Parse Config ([#9232](https://github.com/parse-community/parse-server/issues/9232)) ([90a1e4a](https://github.com/parse-community/parse-server/commit/90a1e4a200423d644efb3f0ba2fba4b99f5cf954))
+
+# [7.3.0-alpha.5](https://github.com/parse-community/parse-server/compare/7.3.0-alpha.4...7.3.0-alpha.5) (2024-07-18)
+
+
+### Bug Fixes
+
+* Parse Server option `maxLogFiles` doesn't recognize day duration literals such as `1d` to mean 1 day ([#9215](https://github.com/parse-community/parse-server/issues/9215)) ([0319cee](https://github.com/parse-community/parse-server/commit/0319cee2dbf65e90bad377af1ed14ea25c595bf5))
+
+# [7.3.0-alpha.4](https://github.com/parse-community/parse-server/compare/7.3.0-alpha.3...7.3.0-alpha.4) (2024-07-18)
+
+
+### Features
+
+* Add atomic operations for Cloud Config parameters ([#9219](https://github.com/parse-community/parse-server/issues/9219)) ([35cadf9](https://github.com/parse-community/parse-server/commit/35cadf9b8324879fb7309ba5d7ea46f2c722d614))
+
+# [7.3.0-alpha.3](https://github.com/parse-community/parse-server/compare/7.3.0-alpha.2...7.3.0-alpha.3) (2024-07-17)
+
+
+### Bug Fixes
+
+* Parse Server installation fails due to post install script incorrectly parsing required min. Node version ([#9216](https://github.com/parse-community/parse-server/issues/9216)) ([0fa82a5](https://github.com/parse-community/parse-server/commit/0fa82a54fe38ec14e8054339285d3db71a8624c8))
+
+# [7.3.0-alpha.2](https://github.com/parse-community/parse-server/compare/7.3.0-alpha.1...7.3.0-alpha.2) (2024-07-17)
+
+
+### Bug Fixes
+
+* Parse Server `databaseOptions` nested keys incorrectly identified as invalid ([#9213](https://github.com/parse-community/parse-server/issues/9213)) ([77206d8](https://github.com/parse-community/parse-server/commit/77206d804443cfc1618c24f8961bd677de9920c0))
+
+# [7.3.0-alpha.1](https://github.com/parse-community/parse-server/compare/7.2.0...7.3.0-alpha.1) (2024-07-09)
+
+
+### Features
+
+* Add Node 22 support ([#9187](https://github.com/parse-community/parse-server/issues/9187)) ([7778471](https://github.com/parse-community/parse-server/commit/7778471999c7e42236ce404229660d80ecc2acd6))
+
+# [7.1.0-alpha.16](https://github.com/parse-community/parse-server/compare/7.1.0-alpha.15...7.1.0-alpha.16) (2024-07-08)
+
+
+### Features
+
+* Add support for dot notation on array fields of Parse Object ([#9115](https://github.com/parse-community/parse-server/issues/9115)) ([cf4c880](https://github.com/parse-community/parse-server/commit/cf4c8807b9da87a0a5f9c94e5bdfcf17cda80cf4))
+
+# [7.1.0-alpha.15](https://github.com/parse-community/parse-server/compare/7.1.0-alpha.14...7.1.0-alpha.15) (2024-07-08)
+
+
+### Features
+
+* Upgrade to @parse/push-adapter 6.4.0 ([#9182](https://github.com/parse-community/parse-server/issues/9182)) ([ef1634b](https://github.com/parse-community/parse-server/commit/ef1634bf1f360429108d29b08032fc7961ff96a1))
+
+# [7.1.0-alpha.14](https://github.com/parse-community/parse-server/compare/7.1.0-alpha.13...7.1.0-alpha.14) (2024-07-07)
+
+
+### Features
+
+* Upgrade to Parse JS SDK 5.3.0 ([#9180](https://github.com/parse-community/parse-server/issues/9180)) ([dca187f](https://github.com/parse-community/parse-server/commit/dca187f91b93cbb362b22a3fb9ee38451799ff13))
+
+# [7.1.0-alpha.13](https://github.com/parse-community/parse-server/compare/7.1.0-alpha.12...7.1.0-alpha.13) (2024-07-01)
+
+
+### Bug Fixes
+
+* Invalid push notification tokens are not cleaned up from database for FCM API v2 ([#9173](https://github.com/parse-community/parse-server/issues/9173)) ([284da09](https://github.com/parse-community/parse-server/commit/284da09f4546356b37511a589fb5f64a3efffe79))
+
 # [7.1.0-alpha.12](https://github.com/parse-community/parse-server/compare/7.1.0-alpha.11...7.1.0-alpha.12) (2024-06-30)
 
 
