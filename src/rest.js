@@ -13,6 +13,7 @@ var RestQuery = require('./RestQuery');
 var RestWrite = require('./RestWrite');
 var triggers = require('./triggers');
 const { enforceRoleSecurity } = require('./SharedRest');
+const reConfigDb = require('./reConfigDb');
 
 function checkTriggers(className, config, types) {
   return types.some(triggerType => {
@@ -26,6 +27,7 @@ function checkLiveQuery(className, config) {
 
 // Returns a promise for an object with optional keys 'results' and 'count'.
 const find = async (config, auth, className, restWhere, restOptions, clientSDK, context) => {
+  config = reConfigDb(config, context);
   const query = await RestQuery({
     method: RestQuery.Method.find,
     config,
@@ -41,6 +43,7 @@ const find = async (config, auth, className, restWhere, restOptions, clientSDK, 
 
 // get is just like find but only queries an objectId.
 const get = async (config, auth, className, objectId, restOptions, clientSDK, context) => {
+  config = reConfigDb(config, context);
   var restWhere = { objectId };
   const query = await RestQuery({
     method: RestQuery.Method.get,
@@ -57,6 +60,7 @@ const get = async (config, auth, className, objectId, restOptions, clientSDK, co
 
 // Returns a promise that doesn't resolve to any useful value.
 function del(config, auth, className, objectId, context) {
+  config = reConfigDb(config, context);
   if (typeof objectId !== 'string') {
     throw new Parse.Error(Parse.Error.INVALID_JSON, 'bad objectId');
   }
@@ -156,6 +160,7 @@ function del(config, auth, className, objectId, context) {
 
 // Returns a promise for a {response, status, location} object.
 function create(config, auth, className, restObject, clientSDK, context) {
+  config = reConfigDb(config, context);
   enforceRoleSecurity('create', className, auth);
   var write = new RestWrite(config, auth, className, null, restObject, null, clientSDK, context);
   return write.execute();
@@ -165,6 +170,7 @@ function create(config, auth, className, restObject, clientSDK, context) {
 // REST API is supposed to return.
 // Usually, this is just updatedAt.
 function update(config, auth, className, restWhere, restObject, clientSDK, context) {
+  config = reConfigDb(config, context);
   enforceRoleSecurity('update', className, auth);
 
   return Promise.resolve()
